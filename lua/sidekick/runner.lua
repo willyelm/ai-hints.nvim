@@ -40,6 +40,16 @@ local function find_win_for_buf(buf)
 	return nil
 end
 
+local function open_result_window()
+	local split_config = config.options.split
+	if split_config.direction == "vertical" then
+		vim.cmd(string.format("vsplit | vertical resize %d", split_config.size))
+	else
+		vim.cmd(string.format("split | resize %d", split_config.size))
+	end
+	return vim.api.nvim_get_current_win()
+end
+
 local function focus_session(session, target_win)
 	if target_win and vim.api.nvim_win_is_valid(target_win) then
 		vim.api.nvim_win_set_buf(target_win, session.buf)
@@ -48,7 +58,7 @@ local function focus_session(session, target_win)
 	end
 	local win = find_win_for_buf(session.buf)
 	if not win then
-		win = panel.open_window()
+		win = open_result_window()
 		vim.api.nvim_win_set_buf(win, session.buf)
 	end
 	vim.api.nvim_set_current_win(win)
@@ -109,7 +119,7 @@ local function start_new_session(tool_name, cmd, files, prompt, target_win)
 	local full_prompt = build_prompt_text(files, prompt)
 	local win = target_win
 	if not win or not vim.api.nvim_win_is_valid(win) then
-		win = panel.open_window()
+		win = open_result_window()
 	end
 	local session = create_session(tool_name, cmd, win)
 	vim.schedule(function()
@@ -217,8 +227,11 @@ local function open_compose(tool_name, cmd)
 			noremap = true,
 			callback = submit_compose,
 		})
-		vim.api.nvim_buf_set_keymap(compose.buf, "i", "<S-CR>", "<CR>", {
+		vim.api.nvim_buf_set_keymap(compose.buf, "i", "<S-CR>", "", {
 			noremap = true,
+			callback = function()
+				vim.api.nvim_paste("\n", true, -1)
+			end,
 		})
 		vim.api.nvim_buf_set_keymap(compose.buf, "n", "q", "", {
 			noremap = true,

@@ -14,11 +14,11 @@ M.defaults = {
 		size = 50,
 	},
 	window = {
-		mode = "float", -- "float" or "split"
+		mode = "float",
 		float = {
-			position = "cursor", -- "cursor" or "center"
-			width = 0.4, -- 0..1 ratio of editor width (capped to 40%)
-			height = 0.4, -- 0..1 ratio of editor height (capped to 40%)
+			position = "cursor",
+			width = 0.2,
+			height = 0.2,
 			border = "rounded",
 			close_on_blur = true,
 		},

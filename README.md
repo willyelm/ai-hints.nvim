@@ -22,7 +22,7 @@ A Neovim plugin that detects TODO/FIXME comments and lets you send them to AI to
 3. A cursor-positioned float opens to select your AI tool
 4. If Sidekick captured a TODO/FIXME comment, it sends it directly
 5. Otherwise, it opens a multiline prompt in the same float (`Enter` submit, `Shift+Enter` newline)
-6. Terminal output appears in that same float window
+6. Terminal output opens in your configured split window
 
 ## Configuration
 
@@ -52,8 +52,8 @@ A Neovim plugin that detects TODO/FIXME comments and lets you send them to AI to
       mode = "float", -- "float" or "split"
       float = {
         position = "cursor", -- "cursor" or "center" (cursor opens below when possible)
-        width = 0.4,         -- capped at 40% of editor width
-        height = 0.4,        -- capped at 40% of editor height
+        width = 0.3,         -- capped at 30% of editor width
+        height = 0.3,        -- capped at 30% of editor height
         border = "rounded",
         close_on_blur = true, -- close float when it loses focus
       },
