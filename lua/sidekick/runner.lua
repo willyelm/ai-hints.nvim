@@ -1,4 +1,5 @@
 local config = require("sidekick.config")
+local panel = require("sidekick.panel")
 
 local M = {}
 local sessions = {}
@@ -39,20 +40,15 @@ local function find_win_for_buf(buf)
 	return nil
 end
 
-local function open_split()
-	local split_config = config.options.split
-	if split_config.direction == "vertical" then
-		vim.cmd(string.format("vsplit | vertical resize %d", split_config.size))
-	else
-		vim.cmd(string.format("split | resize %d", split_config.size))
+local function focus_session(session, target_win)
+	if target_win and vim.api.nvim_win_is_valid(target_win) then
+		vim.api.nvim_win_set_buf(target_win, session.buf)
+		vim.api.nvim_set_current_win(target_win)
+		return target_win
 	end
-	return vim.api.nvim_get_current_win()
-end
-
-local function focus_session(session)
 	local win = find_win_for_buf(session.buf)
 	if not win then
-		win = open_split()
+		win = panel.open_window()
 		vim.api.nvim_win_set_buf(win, session.buf)
 	end
 	vim.api.nvim_set_current_win(win)
@@ -87,6 +83,21 @@ local function create_session(tool_name, cmd, win)
 
 	local session = { buf = buf, job_id = job_id }
 	sessions[tool_name] = session
+
+	local function close_panel()
+		local current_win = vim.api.nvim_get_current_win()
+		if vim.api.nvim_win_is_valid(current_win) then
+			vim.api.nvim_win_close(current_win, true)
+		end
+	end
+
+	vim.keymap.set("t", "<Esc>", function()
+		close_panel()
+	end, { buffer = buf, noremap = true, silent = true })
+	vim.keymap.set("n", "<Esc>", function()
+		close_panel()
+	end, { buffer = buf, noremap = true, silent = true })
+
 	return session
 end
 
@@ -94,15 +105,18 @@ local function build_prompt_text(files, prompt)
 	return "Context Files: " .. table.concat(files, " ") .. " " .. prompt
 end
 
-local function start_new_session(tool_name, cmd, files, prompt)
+local function start_new_session(tool_name, cmd, files, prompt, target_win)
 	local full_prompt = build_prompt_text(files, prompt)
-	local tmp_file = os.tmpname()
-	local f = io.open(tmp_file, "w")
-	f:write(full_prompt)
-	f:close()
-	local shell_cmd = string.format("cat %s | %s; rm %s", tmp_file, cmd, tmp_file)
-	local win = open_split()
-	create_session(tool_name, shell_cmd, win)
+	local win = target_win
+	if not win or not vim.api.nvim_win_is_valid(win) then
+		win = panel.open_window()
+	end
+	local session = create_session(tool_name, cmd, win)
+	vim.schedule(function()
+		if session and session_is_alive(session) then
+			vim.api.nvim_chan_send(session.job_id, full_prompt .. "\r")
+		end
+	end)
 	vim.cmd("startinsert")
 end
 
@@ -197,7 +211,7 @@ local function open_compose(tool_name, cmd)
 		vim.api.nvim_buf_set_option(compose.buf, "buftype", "nofile")
 		vim.api.nvim_buf_set_option(compose.buf, "filetype", "sidekick")
 		vim.api.nvim_buf_set_name(compose.buf, "[Sidekick Compose]")
-		compose.win = open_split()
+		compose.win = panel.open_window()
 		vim.api.nvim_win_set_buf(compose.win, compose.buf)
 		vim.api.nvim_buf_set_keymap(compose.buf, "i", "<CR>", "", {
 			noremap = true,
@@ -212,14 +226,15 @@ local function open_compose(tool_name, cmd)
 		})
 	else
 		if not compose.win or not vim.api.nvim_win_is_valid(compose.win) then
-			compose.win = open_split()
+			compose.win = panel.open_window()
 			vim.api.nvim_win_set_buf(compose.win, compose.buf)
 		end
 		vim.api.nvim_set_current_win(compose.win)
 	end
 end
 
-function M.run_ai_tool(tool_name, prompt, file_path, line_num)
+function M.run_ai_tool(tool_name, prompt, file_path, line_num, opts)
+	opts = opts or {}
 	local tool = config.options.tools[tool_name]
 
 	if type(tool) == "function" then
@@ -241,15 +256,15 @@ function M.run_ai_tool(tool_name, prompt, file_path, line_num)
 		end
 
 		if session_is_alive(session) then
-			focus_session(session)
+			focus_session(session, opts.window)
 			vim.api.nvim_chan_send(session.job_id, build_prompt_text(files, prompt) .. "\r")
 			vim.cmd("startinsert")
 		else
-			start_new_session(tool_name, tool, files, prompt)
+			start_new_session(tool_name, tool, files, prompt, opts.window)
 		end
 	else
 		if session_is_alive(session) then
-			focus_session(session)
+			focus_session(session, opts.window)
 			vim.api.nvim_chan_send(session.job_id, entry .. " ")
 			vim.cmd("startinsert")
 		else
