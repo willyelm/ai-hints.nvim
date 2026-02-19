@@ -11,6 +11,14 @@ local compose = {
 	tool_cmd = nil,
 }
 
+local function safe_set_buf_name(buf, preferred)
+	local ok = pcall(vim.api.nvim_buf_set_name, buf, preferred)
+	if ok then
+		return
+	end
+	pcall(vim.api.nvim_buf_set_name, buf, string.format("%s %d", preferred, buf))
+end
+
 function M.get_tool_names()
 	local tools = {}
 	for tool_name, _ in pairs(config.options.tools) do
@@ -68,7 +76,7 @@ end
 local function create_session(tool_name, cmd, win)
 	local buf = vim.api.nvim_create_buf(true, false)
 	vim.api.nvim_win_set_buf(win, buf)
-	vim.api.nvim_buf_set_name(buf, string.format("[Sidekick %s]", tool_name))
+	safe_set_buf_name(buf, string.format("[Sidekick %s]", tool_name))
 
 	local job_id = vim.fn.termopen(cmd, {
 		on_exit = function()
@@ -220,7 +228,7 @@ local function open_compose(tool_name, cmd)
 		compose.buf = vim.api.nvim_create_buf(false, true)
 		vim.api.nvim_buf_set_option(compose.buf, "buftype", "nofile")
 		vim.api.nvim_buf_set_option(compose.buf, "filetype", "sidekick")
-		vim.api.nvim_buf_set_name(compose.buf, "[Sidekick Compose]")
+		safe_set_buf_name(compose.buf, "[Sidekick Compose]")
 		compose.win = panel.open_window()
 		vim.api.nvim_win_set_buf(compose.win, compose.buf)
 		vim.api.nvim_buf_set_keymap(compose.buf, "i", "<CR>", "", {

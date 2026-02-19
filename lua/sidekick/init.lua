@@ -8,22 +8,34 @@ local M = {}
 local picker_ns = vim.api.nvim_create_namespace("sidekick_picker")
 local prompt_ns = vim.api.nvim_create_namespace("sidekick_prompt")
 
+local function safe_set_buf_name(buf, preferred)
+  local ok = pcall(vim.api.nvim_buf_set_name, buf, preferred)
+  if ok then
+    return
+  end
+  pcall(vim.api.nvim_buf_set_name, buf, string.format("%s %d", preferred, buf))
+end
+
 local function close_win(win)
   if win and vim.api.nvim_win_is_valid(win) then
     vim.api.nvim_win_close(win, true)
   end
 end
 
+local function centered_title(win, text)
+  local width = vim.api.nvim_win_get_width(win)
+  if width <= #text then
+    return text
+  end
+  local pad = math.floor((width - #text) / 2)
+  return string.rep(" ", pad) .. text
+end
+
 local function prompt_from_buf(buf)
   local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
   local prompt_lines = {}
-  local past_header = false
-  for _, line in ipairs(lines) do
-    if past_header then
-      table.insert(prompt_lines, line)
-    elseif line == "" then
-      past_header = true
-    end
+  for i = 2, #lines do
+    table.insert(prompt_lines, lines[i])
   end
   while #prompt_lines > 0 and prompt_lines[#prompt_lines] == "" do
     table.remove(prompt_lines)
@@ -39,10 +51,10 @@ local function open_prompt_input(win, tool, file_path, line_num)
   vim.api.nvim_win_set_buf(win, buf)
   vim.api.nvim_buf_set_option(buf, "buftype", "nofile")
   vim.api.nvim_buf_set_option(buf, "filetype", "prompt")
-  vim.api.nvim_buf_set_name(buf, "[Sidekick Prompt]")
+  safe_set_buf_name(buf, "[Sidekick Prompt]")
+  local title = centered_title(win, "Sidekick Prompt")
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
-    "Sidekick Prompt",
-    "",
+    title,
     "",
   })
   vim.api.nvim_buf_add_highlight(buf, prompt_ns, "Comment", 0, 0, -1)
@@ -83,7 +95,7 @@ local function open_prompt_input(win, tool, file_path, line_num)
     end,
   })
   vim.api.nvim_set_current_win(win)
-  vim.api.nvim_win_set_cursor(win, { 3, 0 })
+  vim.api.nvim_win_set_cursor(win, { 2, 0 })
   vim.cmd("startinsert")
 end
 
@@ -114,7 +126,7 @@ local function open_tool_picker(prompt, file_path, line_num)
   vim.api.nvim_set_option_value("winhl", winhl_with_cursor, { win = win })
   local idx = 1
   local function render()
-    local lines = { "Select AI Tool", "" }
+    local lines = { centered_title(win, "Select AI Tool") }
     for i, tool in ipairs(tools) do
       table.insert(lines, "  " .. tool)
     end
@@ -123,7 +135,7 @@ local function open_tool_picker(prompt, file_path, line_num)
     vim.api.nvim_buf_clear_namespace(buf, picker_ns, 0, -1)
     vim.api.nvim_buf_add_highlight(buf, picker_ns, "Comment", 0, 0, -1)
     vim.api.nvim_buf_set_option(buf, "modifiable", false)
-    vim.api.nvim_win_set_cursor(win, { idx + 2, 0 })
+    vim.api.nvim_win_set_cursor(win, { idx + 1, 0 })
   end
 
   local function choose()
